@@ -1,0 +1,121 @@
+/*STANDARD HTML TYPES USED*/
+html {
+    background-color: rgb(17, 21, 33);
+    color: #e2e8f0;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    line-height: 1.5;
+}
+
+body {
+    margin: 0;
+    padding: 2rem;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+h1 {
+    font-size: 1.8rem;
+    color: #ffffff;
+}
+
+h2 {
+    font-size: 1.4rem;
+    color: #38bdf8;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+h3 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 0.4rem;
+}
+
+h4 {
+    font-size: 0.95rem;
+    color: #cbd5e1;
+    margin: 0 0 0.2rem 0;
+    font-family: monospace;
+}
+
+p {
+    margin: 0 0 0.5rem 0;
+    color: #cbd5e1;
+}
+
+/*CPPDOC SUPPORTED TYPES*/
+.file_title > * {
+    background-color: rgb(1, 1, 29);
+    margin: 0;
+    padding: 1.5rem;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 2px solid #334155;
+    text-align: center;
+}
+
+.function {
+    background-color: rgb(24, 30, 48);
+    border: 1px solid rgb(37, 46, 73);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.function_name {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.function_description {
+    margin-bottom: 1.2rem;
+}
+
+.return {
+    margin-bottom: 1.2rem;
+    background-color: rgba(15, 23, 42, 0.4);
+    padding: 0.8rem 1rem;
+    border-radius: 6px;
+    border-left: 3px solid #38bdf8;
+}
+
+.return_description {
+    font-size: 0.95rem;
+}
+
+.parameters {
+    margin-bottom: 1.2rem;
+    background-color: rgba(15, 23, 42, 0.4);
+    padding: 0.8rem 1rem;
+    border-radius: 6px;
+    border-left: 3px solid #a855f7;
+}
+
+.parameter_instance {
+    margin-bottom: 0.75rem;
+}
+
+.parameter_instance:last-child {
+    margin-bottom: 0;
+}
+
+.parameter_description {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    margin-left: 0.5rem;
+}
+
+.other {
+    background-color: rgba(15, 23, 42, 0.4);
+    padding: 0.8rem 1rem;
+    border-radius: 6px;
+    border-left: 3px solid #10b981;
+}
+
+.other_description {
+    font-size: 0.95rem;
+}
