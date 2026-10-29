@@ -10,7 +10,7 @@ CppDoc is a function documentation generator similar to systems such as Doxygen 
 **OTHR:** Any other information that may be found important to the user <br>
 
 Each one of these arguments is optional, but cannot be repeated. **Don't like the keywords? You can change them with CppDocKeyWords::modify_key()** <br>
-modify_key() takes 2 arguments: a CPPDOC_KEYS enum value for the key type, and a string to represent your new key. <br><br>
+modify_key() takes 2 arguments: a CPPDOC_KEYS enum value for the key type, and a string to represent your new key. (Note: only 1 colon : is permitted for new keys and it must be a trailing colon)<br><br>
 
 **simple_scan() vs scan()** <br>
 simple_scan() takes the directory that you call CppDoc in and searches through all .cpp files for potential CppDoc functions. **simple_scan() does not work on nested .cpp files**. To instruct CppDoc to search through other file sets you must use scan() (currently unable in version 0.3.0e). <br><br>
