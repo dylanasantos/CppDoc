@@ -20,11 +20,21 @@ namespace {
     const std::string ASCII_ESC = "\033\\";
     const std::string HYPERLINK_END = "\033]8;;\033\\";
 
+    bool is_cppdoc_indicator(std::string& line) {
+        if(line.empty()) return false;
+
+        auto start = line.find_first_not_of(WS_EDGECASES);
+        auto end = line.find_last_not_of(WS_EDGECASES);
+
+        if(start == std::string::npos) return false;
+        if(end == std::string::npos || end < start) end = line.size();
+
+        std::string text = line.substr(start, (end - start) + 1);
+        return text == CPPDOC_INDICATOR;
+    }
+
     void collapse_line(std::string &line, bool inside_function) 
-    {
-        size_t spaced_colon_pos = line.find(": ");
-        if(spaced_colon_pos != std::string::npos) line.erase(spaced_colon_pos + 1, 1);
-        
+    {   
         line.erase(line.begin(), find_if(line.begin(), line.end(), [](char ch){
             return !std::isspace(ch);
         }));
@@ -41,14 +51,16 @@ namespace {
 
         try 
         {
-            line = std::regex_replace(line, std::regex(R"(\s*:\s*)"), ": ");
-
             if(!inside_function)
             {
                 line = std::regex_replace(line, std::regex(R"(\s*\(\s*)"), " ( ");
                 line = std::regex_replace(line, std::regex(R"(\s*\)\s*)"), " ) ");
                 line = std::regex_replace(line, std::regex(R"(\s*=\s*)"), " = ");
                 line = std::regex_replace(line, std::regex(R"(\s*,\s*)"), " , ");
+                line = std::regex_replace(line, std::regex(R"(\s*\*\s*)"), " * ");
+            }
+            else {
+                line = std::regex_replace(line, std::regex(R"(\s*:\s*)"), ": ");
             }
             
             //clean up any double spaces created by the replacement
@@ -64,7 +76,7 @@ namespace {
     }
 
 
-    int count_bracket(std::string_view bracket_type, std::string line) 
+    int count_bracket(std::string_view bracket_type, std::string_view line) 
     {
         char open = bracket_type.at(0);
         char close = bracket_type.at(1);
@@ -82,7 +94,7 @@ namespace {
 
 CppDoc::CppDoc(std::filesystem::path dir, bool debug_status) {
     this->log_debug = debug_status;
-    this->simple_scan(dir);
+    this->recursive_scan(dir);
 }
 
 
@@ -96,8 +108,12 @@ CppDoc::CppDoc(SCAN_TYPE type, std::filesystem::path dir, bool debug_status) {
             this->simple_scan(dir);
             break;
 
-        case SCAN_TYPE::FILEREAD: 
-            this->scan(dir);
+        case SCAN_TYPE::RECURSIVE: 
+            this->recursive_scan(dir);
+            break;
+
+        case SCAN_TYPE::SPECIFY:
+            this->specify_scan(dir);
             break;
 
         default:
@@ -107,7 +123,6 @@ CppDoc::CppDoc(SCAN_TYPE type, std::filesystem::path dir, bool debug_status) {
 
 
 
-//Used only for checking for C++ files within the same dir as the main file
 void CppDoc::simple_scan(std::filesystem::path local_dir)
 {
     try
@@ -116,7 +131,7 @@ void CppDoc::simple_scan(std::filesystem::path local_dir)
 
         if(std::filesystem::exists(active_dir) && std::filesystem::is_directory(active_dir))
         {
-            for(const auto &item : std::filesystem::directory_iterator(active_dir))
+            for(const auto& item : std::filesystem::directory_iterator(active_dir))
             {
                 std::filesystem::path item_path = item.path();
 
@@ -141,22 +156,47 @@ void CppDoc::simple_scan(std::filesystem::path local_dir)
 
 
 
-void CppDoc::scan(std::filesystem::path cppdoc_file_dir)
+void CppDoc::recursive_scan(std::filesystem::path local_dir)
 {
+    try
+    {
+        std::filesystem::path active_dir = std::filesystem::is_directory(local_dir) ? local_dir : local_dir.parent_path();
 
+        if(std::filesystem::exists(active_dir) && std::filesystem::is_directory(active_dir))
+        {
+            for(const auto& item : std::filesystem::recursive_directory_iterator(active_dir))
+            {
+                std::filesystem::path item_path = item.path();
+
+                if(item_path.extension() == ".cpp") 
+                {
+                    this->ACTIVE_FILE = item_path;
+                    parse_file(item_path);
+                }
+            }
+        }
+    }
+    catch(const std::filesystem::filesystem_error &fse)
+    {
+        std::cerr << "!cppdoc -> an error occured with parsing through your directory: [" << fse.what() << "]\n";
+    }
 }
 
 
-void CppDoc::format_metadata(const std::vector<std::vector<std::string>> &data)
+
+void CppDoc::specify_scan(std::filesystem::path cppdoc_instructions){}
+
+
+
+void CppDoc::format_metadata(const std::vector<std::vector<std::string>>& data)
 {
     /* TODO:
         IMPORTANT: make sure special keyword types can be enabled/disabled, there should also be a whitelist & blacklist option
     */
-
     CppDocHTMLMaker manager;
     for(std::vector function : data)
     {
-        manager.push_function();
+        manager.new_function();
 
         std::string header_full = "";
         size_t parenthesis_ctr = 0;
@@ -213,6 +253,7 @@ void CppDoc::parse_file(std::filesystem::path file_dir)
     int bracket_ctr = 0; //accounts for internal brackets {} to avoid exiting a function early
     int parenth_ctr = 0; //accounts for internal parenthesis () in a functions args to assure the correct starting bracket 
 
+    bool contains_cppdoc = false;
     bool is_cppdoc_function = false;
     bool in_args = false;
     bool inside_cppdoc_function = false;
@@ -226,8 +267,10 @@ void CppDoc::parse_file(std::filesystem::path file_dir)
 
     while(std::getline(file, line))
     {
-        if(line.find(CPPDOC_INDICATOR) != std::string::npos)
+        if(is_cppdoc_indicator(line))
         {
+            if(!contains_cppdoc) contains_cppdoc = true;
+
             is_cppdoc_function = true;
             continue;
         }
@@ -324,7 +367,7 @@ void CppDoc::parse_file(std::filesystem::path file_dir)
             text_placeholder.push_back(line);
         }
     }
-    format_metadata(function_metadata);
+    if(contains_cppdoc) format_metadata(function_metadata);
 }
 
 
@@ -354,6 +397,12 @@ std::string CppDocKeyWords::modify_key(CPPDOC_KEYS key, std::string_view new_key
 {
     if(new_key == def_key || new_key == arg_key || new_key == ret_key || new_key == othr_key)
         throw std::invalid_argument("CppDocKeyWords modify_key() cannot have two keywords share the same key");
+
+    if(std::count(new_key.begin(), new_key.end(), ':') > 1)
+        throw std::invalid_argument("CppDocKeyWords modify_key() new_key does not permit keys with > 1 colon");
+
+    if(new_key.find(":") < new_key.size() - 1) 
+        throw std::invalid_argument("CppDocKeyWords modify_key() new_key only permits trailing colons");
     
     std::string temp;
 
@@ -390,7 +439,7 @@ std::string CppDocKeyWords::modify_key(CPPDOC_KEYS key, std::string_view new_key
 
 
 
-bool CppDocKeyWords::is_key(std::string_view potential_key) 
+bool CppDocKeyWords::is_key(std::string_view potential_key)
 {
     if(potential_key == def_key || potential_key == arg_key || potential_key == ret_key || potential_key == othr_key) return true;
     return false;

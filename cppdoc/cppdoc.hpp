@@ -12,12 +12,13 @@
 
 class CppDoc {
     public:
-        inline const static std::string CPPDOC_VERSION = "0.3.0e";
+        inline const static std::string CPPDOC_VERSION = "0.4.0e";
         inline static bool log_debug = false; //displays debug print statements inside terminal
 
         enum class SCAN_TYPE {
             SIMPLE,
-            FILEREAD
+            RECURSIVE,
+            SPECIFY
         };
 
         enum class CPPDOC_KEYS {
@@ -29,11 +30,12 @@ class CppDoc {
         };
 
         CppDoc() = default;
-        explicit CppDoc(std::filesystem::path, bool=false); //calls simple_scan on local directory off file put in
+        explicit CppDoc(std::filesystem::path, bool=false); //calls recursive_scan on local directory off file put in
         explicit CppDoc(SCAN_TYPE, std::filesystem::path, bool=false); //calls whatever scan is requested on given file
 
         void simple_scan(std::filesystem::path); //reads through the local directory simple_scan is called on
-        void scan(std::filesystem::path); //[INACTIVE] reads a custom cppdoc file for the instructions on which cpp files can be read
+        void recursive_scan(std::filesystem::path); //reads through local directory and the subdirectories inside that recursive_scan is called on
+        void specify_scan(std::filesystem::path); //[INACTIVE] reads a custom cppdoc file for the instructions on which cpp files can be read
 
     protected:
         inline static const std::filesystem::path CPPDOC_SOURCE = std::filesystem::path(__FILE__).parent_path();
@@ -55,7 +57,8 @@ class CppDocKeyWords : CppDoc {
         CppDocKeyWords() = delete;
 
         void simple_scan() = delete;
-        void scan() = delete;
+        void recursive_scan() = delete;
+        void specify_scan() = delete;
 
         static std::string grab_key(CPPDOC_KEYS); //grabs requested CPPDOC Key
         static std::string modify_key(CPPDOC_KEYS, std::string_view); //changes requested CPPDOC key to selected string

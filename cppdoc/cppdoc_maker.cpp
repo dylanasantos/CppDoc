@@ -16,11 +16,20 @@ static const std::string EXIT_COMMENT = "*/";
 static const std::string DEFAULT_INDENT = "\t\t";
 static const std::string DEFAULT_SPACER = "\n\n";
 
+namespace {
+    //helper function used for checking if the argument uses an extra keyword (const or volatile)
+    bool SPECIAL_ARG(std::string_view keyword) noexcept {
+        if(keyword == "const" || keyword == "volatile") return true;
+
+        return false;
+    }
+}
+
 CppDocHTMLMaker::CppDocHTMLMaker(std::string header) {
     this->handle_header(header);
 }
 
-bool CppDocHTMLMaker::name_in_args(std::string needle, function_data haystack) {
+bool CppDocHTMLMaker::name_in_args(std::string_view needle, const function_data& haystack) {
     needle = needle.substr(0, needle.size() - 1); //remove the colon attached to each cppdoc arg title (ex: var_name:)
 
     for(arg_data arg : haystack.args) {
@@ -29,9 +38,9 @@ bool CppDocHTMLMaker::name_in_args(std::string needle, function_data haystack) {
     return false;
 }
 
-std::optional<std::pair<std::string, std::string>> CppDocHTMLMaker::name_in_cppdoc_args(std::string needle, function_data haystack) {
+std::optional<CppDocHTMLMaker::cppdoc_arg> CppDocHTMLMaker::get_from_cppdoc_args(std::string_view needle, const function_data& haystack) {
     for(auto arg : haystack.cppdoc_args) {
-        if(arg.first == needle) {
+        if(arg.var_name == needle) {
             return arg;
         }
     }
@@ -60,21 +69,37 @@ std::string CppDocHTMLMaker::format_data() {
             DEFAULT_INDENT + "</div>" + DEFAULT_SPACER;
         
         lines += DEFAULT_INDENT + R"(<div class="parameters">
-            <h3>parameters:</h3>)" + DEFAULT_SPACER;
+            <h3>parameters:)";
+            
+        if(fn.args.size() == 0) {
+            lines += " (N/A)</h3>" + DEFAULT_SPACER; 
+        }
+        else {
+            lines += "</h3>" + DEFAULT_SPACER;
+        }
 
         for(arg_data arg : fn.args) {
-            auto cppdoc_arg = name_in_cppdoc_args(arg.name, fn);
+            auto cppdoc_arg = get_from_cppdoc_args(arg.name, fn);
 
             lines += DEFAULT_INDENT + "\t" R"(<div class="parameter_instance">
-                <h4>)" + arg.name + "(" + arg.data_type;
+                <h4>)" + arg.name + "(";
 
-            if(arg.default_value != "N/A") {
+            if(!arg.special_type.empty()) {
+                lines += arg.special_type + " ";
+            }
+            lines += arg.data_type;
+
+            if(!arg.value_const.empty()) {
+                lines += " " + arg.value_const;
+            }
+
+            if(!arg.default_value.empty()) {
                 lines += " | defaults to: " + arg.default_value;
             }
             lines += ")</h4>\n" + DEFAULT_INDENT;
 
             if(cppdoc_arg) {
-                lines += "\t\t" R"(<p class="parameter_description">)" + cppdoc_arg.value().second + "</p>\n"
+                lines += "\t\t" R"(<p class="parameter_description">)" + cppdoc_arg.value().text + "</p>\n"
                 + DEFAULT_INDENT;
             }
             lines += "\t</div>\n";
@@ -92,7 +117,7 @@ std::string CppDocHTMLMaker::format_data() {
     return lines;
 }
 
-void CppDocHTMLMaker::push_function() {
+void CppDocHTMLMaker::new_function() {
     function_data next;
     this->file_functions.push_back(next);
 }
@@ -118,10 +143,10 @@ void CppDocHTMLMaker::handle_header(std::string header)
             continue;
         }
 
-        auto op_search = OPERATOR_SPECIALS.find(keyword);
-        if(op_search != OPERATOR_SPECIALS.end()) 
+        auto search = FUNCTION_INDICATORS.find(keyword);
+        if(search != FUNCTION_INDICATORS.end()) 
         {
-            switch(op_search->second) {
+            switch(search->second) {
                 case SPECIAL_TYPE::OPEN_PAR:
                     parenthesis_ctr++;
                     break;
@@ -130,8 +155,11 @@ void CppDocHTMLMaker::handle_header(std::string header)
                     parenthesis_ctr--;
                     
                     if(parenthesis_ctr == 0) {
-                        current_function.args.push_back(arg_placeholder);
-                        arg_placeholder.clear();
+                        if(!current_function.args.empty())
+                        {
+                            current_function.args.push_back(arg_placeholder);
+                            arg_placeholder.clear();
+                        }
                     }
                     break;
 
@@ -143,29 +171,38 @@ void CppDocHTMLMaker::handle_header(std::string header)
                     current_function.args.push_back(arg_placeholder);
                     arg_placeholder.clear();
                     break;
-            }
-            continue;
-        }
-
-        auto key_search = KEYWORD_SPECIALS.find(keyword);
-        if(key_search != KEYWORD_SPECIALS.end() && parenthesis_ctr == 0)
-        {
-            switch(key_search->second) {
+                
                 case SPECIAL_TYPE::PRENAME:
                     current_function.pre_name_specials.push_back(keyword);
                     break;
+                
+                case SPECIAL_TYPE::POSTNAME:
+                    if(parenthesis_ctr > 0 && SPECIAL_ARG(keyword)) //used for arguments with const & volatile (ex: const int x)
+                    {
+                        if(!arg_placeholder.data_type.empty()) { //used for examples such as (const int* const x) or (int* const x)
+                            arg_placeholder.value_const = keyword;
+                        }
+                        else {
+                            arg_placeholder.special_type = keyword;
+                        }
+                        break;
+                    }
 
-                case SPECIAL_TYPE::POSTARG:
                     current_function.post_arg_specials.push_back(keyword);
                     break;
                 
+                case SPECIAL_TYPE::POINTER:
+                case SPECIAL_TYPE::REFERENCE:
+                    arg_placeholder.data_type += keyword;
+                    break;
+
                 default:
                     throw std::invalid_argument("!CPPDOC CppDocHTMLMaker::handle_header() could not resolve location of keyword: " 
-                    + keyword + " (unexpected behavior)\n");
+                        + keyword + " (unexpected behavior)\n");
             }
             continue;
         }
-
+  
         if(current_function.return_type.empty())
         {
             current_function.return_type = keyword;
@@ -176,7 +213,7 @@ void CppDocHTMLMaker::handle_header(std::string header)
             current_function.function_name = keyword;
             continue;
         }
-        else if(arg_placeholder.data_type.empty()) //IMPORTANT: this does not consider specials like const
+        else if(arg_placeholder.data_type.empty())
         {
             arg_placeholder.data_type = keyword;
         }
@@ -194,7 +231,7 @@ void CppDocHTMLMaker::handle_body(std::string body)
     std::stringstream seperator(body);
     std::string word;
 
-    std::pair<std::string, std::string> new_cppdoc_arg;
+    cppdoc_arg new_cppdoc_arg;
     CPPDOC_KEYS current_description = CPPDOC_KEYS::NONE;
 
     while(seperator >> word)
@@ -207,8 +244,7 @@ void CppDocHTMLMaker::handle_body(std::string body)
             if(current_description == CPPDOC_KEYS::ARGS) 
             {
                 current_function.cppdoc_args.push_back(new_cppdoc_arg);
-                new_cppdoc_arg.second.clear();
-                new_cppdoc_arg.first.clear();
+                new_cppdoc_arg.clear();
             }
             current_description = type_result;
             continue;
@@ -222,15 +258,15 @@ void CppDocHTMLMaker::handle_body(std::string body)
             case CPPDOC_KEYS::ARGS:
                 if(name_in_args(word, current_function)) 
                 {
-                    if(!new_cppdoc_arg.first.empty()) 
+                    if(!new_cppdoc_arg.var_name.empty())
                     {
                         current_function.cppdoc_args.push_back(new_cppdoc_arg);
-                        new_cppdoc_arg.second.clear();
+                        new_cppdoc_arg.clear();
                     }
-                    new_cppdoc_arg.first = word.substr(0, word.size() - 1);
+                    new_cppdoc_arg.var_name = word.substr(0, word.size() - 1); //removes colon from description (ex: var_name: text)
                 }
-                else if(!new_cppdoc_arg.first.empty()) {
-                    new_cppdoc_arg.second += word + " ";
+                else if(!new_cppdoc_arg.var_name.empty()) {
+                    new_cppdoc_arg.text += word + " ";
                 }
                 break;
 
@@ -251,9 +287,9 @@ void CppDocHTMLMaker::handle_body(std::string body)
         std::cout << "CPPDOC COMMENT DEFINITION: " << current_function.cppdoc_def << "\n\n";
 
         std::cout << "CPPDOC ARUMENTS DEFINITION(S):\n";
-        for(auto c : current_function.cppdoc_args) {
-            std::cout << "\tARGUMENT: " << c.first << "\n";
-            std::cout << "\tDESCRIPTION: " << c.second << "\n";
+        for(auto curr : current_function.cppdoc_args) {
+            std::cout << "\tARGUMENT: " << curr.var_name << "\n";
+            std::cout << "\tDESCRIPTION: " << curr.text << "\n";
         }
 
         std::cout << "\nCPPDOC COMMENT RETURN: " << current_function.cppdoc_ret << "\n\n";
