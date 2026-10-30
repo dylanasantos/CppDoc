@@ -1,7 +1,7 @@
 # CppDoc
 CppDoc is a function documentation generator similar to systems such as Doxygen or Pydoc for C++ programs. Intended to be a very simple and easy generator. <br><br>
 
-**How to Use CppDoc v0.3.0e** <br>
+**How to Use CppDoc v0.4.0e** <br>
 <u>(live example can also be found in demo.cpp)</u> In order to use cppdoc it requires 2 traits: a CppDoc function indicator (//!CPPDOC), and a multi-lined comment inside the function. CppDoc function indicators can be denoted by //!CPPDOC above function names. Inside the multi lined comment they are 4 potential keyword type: **DEF: ARGS: RET: OTHR:**. <br>
 
 **DEF:** Used for the functions description/definition. <br>
@@ -30,3 +30,11 @@ Not all function types are currently supported. This is only intended for standa
 All html documents are logged and hyperlinked inside of your terminal. If you are having issues access the link, any files made by CppDoc will be added inside of cppdoc/documents. (likely reorganized later) <br><br>
 
 If you do noy like the css formatting, you can always change the css file or the design through cppdoc/documentation/reference.css or be replacing reference.css with a separate reference.css file.
+
+# What Does My CppDoc Version Represent?
+All CppDoc versions are logging inside html files through a comment inside the head tag, which should be along the lines of: "DOCUMENT FORMATTED VIA CPPDOC VERSION x.x.x" as a reference to potential bugs and unimplemented features. <br><br>
+
+**version e:** Experimental versions, not all bugs intended to be resolved have been properly checked. (stacks with other versions, ex: 0.4.0ea> <br>
+**version a:** Alpha versions, very early, stable versions of CppDoc, lacking some core elements. <br>
+**version b:** Beta versions, early, stable versions of CppDoc which contain the basic & core elements. <br>
+**version s:** Stable versions, core features implemented with optomizations made along with new additional features.<br>
